@@ -4,49 +4,27 @@ import Alert from "../alert/Alert";
 import Confirm from "../confirm/Confirm";
 import Task from "./Task";
 import "./TaskManager.css";
-
-const taskReducer = (state, action) => {
-  //
-  if (action.type === "EMPTY_FIELD") {
-    return {
-      ...state,
-      isAlertOpen: true,
-      alertContent: "Please Enter the Name And Date",
-      alertClass: "danger",
-    };
-  }
-  if (action.type === "CLOSE_ALERT") {
-    return { ...state, isAlertOpen: false };
-  }
-  if (action.type === "ADD_TASK") {
-    const allTasks = [...state.tasks, action.payload];
-    return {
-      ...state,
-      tasks: allTasks,
-      isAlertOpen: true,
-      alertContent: "Task added Successfully",
-      alertClass: "success",
-    };
-  }
-  return state;
-};
+import { taskReducer } from "../taskManager/taskReducer";
 
 const TaskManagerReducer = () => {
   const [name, setName] = useState("");
   const [date, setDate] = useState("");
   const [tasks, setTasks] = useLocalStorage("tasks", []);
 
-  const [taskId, setTaskId] = useState(null);
-
   //
 
   const initialState = {
     tasks,
-    taskId: null,
+    taskID: null,
     isEditing: false,
     isAlertOpen: false,
     alertContent: "This is an alert",
     alertClass: "success",
+    isEditModalOpen: false,
+    isDeleteModalOpen: false,
+    modalTitle: "delte Task",
+    modalMsg: "uou about to delte task",
+    modalActionText: "ok",
   };
 
   //
@@ -59,6 +37,34 @@ const TaskManagerReducer = () => {
       dispatch({
         type: "EMPTY_FIELD",
       });
+    }
+    if (name && date && state.isEditing) {
+      const updateTask = {
+        id: state.taskID,
+        name,
+        date,
+        complete: false,
+      };
+      dispatch({
+        type: "UPDATE_TASK",
+        payload: updateTask,
+      });
+      setName("");
+      setDate("");
+      setTasks(
+        tasks.map((task) => {
+          if (task.id === updateTask.id) {
+            return {
+              ...task,
+              name,
+              date,
+              complete: false,
+            };
+          }
+          return task;
+        })
+      );
+      return;
     }
     if (name && date) {
       const newTask = {
@@ -83,16 +89,64 @@ const TaskManagerReducer = () => {
     nameInputRef.current.focus();
   }, []);
 
-  const handleEditTask = (id) => {
-    //
+  const openEditModal = (id) => {
+    dispatch({
+      type: "OPEN_EDIT_MODAL",
+      payload: id,
+    });
   };
 
-  const deleteTask = (id) => {
-    //
+  const editTask = () => {
+    const id = state.taskID;
+    dispatch({
+      type: "EDIT_TASK",
+      payload: id,
+    });
+    const thisTask = state.tasks.find((task) => task.id === id);
+    setName(thisTask.name);
+    setDate(thisTask.date);
+    closeModal();
+  };
+
+  const openDeleteModal = (id) => {
+    dispatch({
+      type: "OPED_DELETE_MODAL",
+      payload: id,
+    });
+  };
+
+  const deleteTask = () => {
+    const id = state.taskID;
+    dispatch({
+      type: "DELETE_TASK",
+      payload: id,
+    });
+    const newTasks = tasks.filter((task) => task.id !== id);
+    setTasks(newTasks);
   };
 
   const completeTask = (id) => {
-    //
+    dispatch({
+      type: "COMPLETE_TASK",
+      payload: id,
+    });
+    setTasks(
+      tasks.map((task) => {
+        if (task.id === id) {
+          return {
+            ...task,
+            completed: true,
+          };
+        }
+        return tasks;
+      })
+    );
+  };
+
+  const closeModal = () => {
+    dispatch({
+      type: "CLOSE_MODAL",
+    });
   };
 
   const closeAlert = () => {
@@ -111,8 +165,25 @@ const TaskManagerReducer = () => {
           onCloseAlert={closeAlert}
         />
       )}
+      {state.isEditModalOpen && (
+        <Confirm
+          modalTitle={state.modalTitle}
+          modalMsg={state.modalMsg}
+          modalActionText={state.modalActionText}
+          modalAction={editTask}
+          onCloseModal={closeModal}
+        />
+      )}
+      {state.isDeleteModalOpen && (
+        <Confirm
+          modalTitle={state.modalTitle}
+          modalMsg={state.modalMsg}
+          modalActionText={state.modalActionText}
+          modalAction={deleteTask}
+          onCloseModal={closeModal}
+        />
+      )}
 
-      {/* <Confirm /> */}
       <h1 className="--text-center --text-light">Task Manager Reducer</h1>
       <div className="--flex-center --p">
         <div className="--card --bg-light --width-500px --p --flex-center">
@@ -157,8 +228,8 @@ const TaskManagerReducer = () => {
                 return (
                   <Task
                     {...task}
-                    editTask={handleEditTask}
-                    deleteTask={deleteTask}
+                    editTask={openEditModal}
+                    deleteTask={openDeleteModal}
                     completeTask={completeTask}
                   />
                 );
